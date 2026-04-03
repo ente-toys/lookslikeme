@@ -75,7 +75,7 @@ type PendingRequest = {
   onProgress?: (progress: ModelPreloadProgress) => void;
 };
 
-const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
+let worker: Worker | null = null;
 const pending = new Map<string, PendingRequest>();
 
 function isMobileDevice(): boolean {
@@ -113,11 +113,6 @@ function getPreferredModelFamily(): "buffalo_l" | "buffalo_s" {
 }
 
 const preferredModelFamily = getPreferredModelFamily();
-worker.postMessage({
-  type: "configure-model-family",
-  modelFamily: preferredModelFamily,
-} satisfies ConfigureModelFamilyMessage);
-
 (globalThis as typeof globalThis & { __LLU_MODEL_FAMILY__?: string }).__LLU_MODEL_FAMILY__ =
   preferredModelFamily;
 
@@ -128,39 +123,52 @@ function rejectAllPending(error: Error) {
   pending.clear();
 }
 
-worker.addEventListener("message", (event: MessageEvent<WorkerReply>) => {
-  const message = event.data;
-  const request = pending.get(message.requestId);
-  if (!request) {
-    return;
-  }
+function getWorker(): Worker {
+  if (worker) return worker;
 
-  if (message.type === "preload-progress") {
-    request.onProgress?.(message.progress);
-    return;
-  }
+  worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
 
-  pending.delete(message.requestId);
-  if (message.type === "compare-result" || message.type === "family-analysis-result") {
-    request.resolve(message.result);
-    return;
-  }
+  worker.addEventListener("message", (event: MessageEvent<WorkerReply>) => {
+    const message = event.data;
+    const request = pending.get(message.requestId);
+    if (!request) {
+      return;
+    }
 
-  if (message.type === "preload-result") {
-    request.resolve(undefined);
-    return;
-  }
+    if (message.type === "preload-progress") {
+      request.onProgress?.(message.progress);
+      return;
+    }
 
-  request.reject(new Error(message.error));
-});
+    pending.delete(message.requestId);
+    if (message.type === "compare-result" || message.type === "family-analysis-result") {
+      request.resolve(message.result);
+      return;
+    }
 
-worker.addEventListener("error", (event) => {
-  rejectAllPending(new Error(event.message || "Browser ML worker crashed"));
-});
+    if (message.type === "preload-result") {
+      request.resolve(undefined);
+      return;
+    }
 
-worker.addEventListener("messageerror", () => {
-  rejectAllPending(new Error("Browser ML worker could not deserialize a message"));
-});
+    request.reject(new Error(message.error));
+  });
+
+  worker.addEventListener("error", (event) => {
+    rejectAllPending(new Error(event.message || "Browser ML worker crashed"));
+  });
+
+  worker.addEventListener("messageerror", () => {
+    rejectAllPending(new Error("Browser ML worker could not deserialize a message"));
+  });
+
+  worker.postMessage({
+    type: "configure-model-family",
+    modelFamily: preferredModelFamily,
+  } satisfies ConfigureModelFamilyMessage);
+
+  return worker;
+}
 
 async function serializeFiles(files: File[]): Promise<SerializedFile[]> {
   return Promise.all(
@@ -183,7 +191,7 @@ function postWorkerMessage<T>(
       reject,
       onProgress,
     });
-    worker.postMessage(message, transferList);
+    getWorker().postMessage(message, transferList);
   });
 }
 
