@@ -454,6 +454,7 @@ function App() {
           <FamilyPhotoForm loading={loading} onAnalyze={handleFamilyAnalyze} onPhotosAdded={startModelPreload} />
         )}
 
+        <p className="mt-8 text-center text-xs text-neutral-400">v{__APP_VERSION__}</p>
       </div>
     </div>
   );

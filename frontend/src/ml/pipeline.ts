@@ -35,6 +35,10 @@ const LANDMARK_INPUT_SIZE = 192;
 const MODEL_CACHE_DB_NAME = "copyofyou-browser-ml-cache";
 const MODEL_CACHE_STORE = "models";
 const MODEL_CACHE_VERSION = 1;
+
+const FACE_CACHE_DB_NAME = "lookslikeme-face-cache";
+const FACE_CACHE_STORE = "faces";
+const FACE_CACHE_VERSION = 1;
 const MODEL_CDN_ROOT = (import.meta.env.VITE_LLU_MODEL_ROOT ?? "https://models.ente.io/lookslikeus").replace(/\/$/, "");
 type ModelFamily = "buffalo_l" | "buffalo_s";
 type ModelKey = "detector" | "recognition" | "landmark";
@@ -131,6 +135,7 @@ let landmarkSessionPromise: Promise<ort.InferenceSession> | null = null;
 let modelsReadyPromise: Promise<void> | null = null;
 let modelBuffersPromise: Promise<void> | null = null;
 let modelCacheDbPromise: Promise<IDBDatabase | null> | null = null;
+let faceCacheDbPromise: Promise<IDBDatabase | null> | null = null;
 let inferenceQueue: Promise<unknown> = Promise.resolve();
 const anchorCenterCache = new Map<string, Float32Array>();
 const familyClusterSessions = new Map<string, FamilyClusterInternal[]>();
@@ -432,6 +437,130 @@ async function deleteModelBytesFromCache(key: ModelKey): Promise<void> {
 
     const transaction = database.transaction(MODEL_CACHE_STORE, "readwrite");
     transaction.objectStore(MODEL_CACHE_STORE).delete(getModelCacheKey(key));
+    transaction.oncomplete = finish;
+    transaction.onerror = finish;
+    transaction.onabort = finish;
+  });
+}
+
+// ---- Face analysis cache ----
+
+type CachedFace = {
+  bbox: BBox;
+  detScore: number;
+  embedding: ArrayBuffer;
+  landmark3d68: Point3[] | null;
+  thumbnail: string | null;
+};
+
+async function hashFileBytes(bytes: ArrayBuffer): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const arr = new Uint8Array(digest);
+  let hex = "";
+  for (const b of arr) {
+    hex += b.toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
+function faceCacheKey(fileHash: string): string {
+  return `${activeModelFamily}:${fileHash}`;
+}
+
+async function openFaceCacheDb(): Promise<IDBDatabase | null> {
+  if (typeof indexedDB === "undefined") {
+    return null;
+  }
+
+  faceCacheDbPromise ??= new Promise<IDBDatabase | null>((resolve) => {
+    const request = indexedDB.open(FACE_CACHE_DB_NAME, FACE_CACHE_VERSION);
+
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(FACE_CACHE_STORE)) {
+        database.createObjectStore(FACE_CACHE_STORE);
+      }
+    };
+
+    request.onsuccess = () => {
+      resolve(request.result);
+    };
+
+    request.onerror = () => {
+      resolve(null);
+    };
+
+    request.onblocked = () => {
+      resolve(null);
+    };
+  });
+
+  return faceCacheDbPromise;
+}
+
+async function readFacesFromCache(
+  fileHash: string,
+): Promise<CachedFace[] | null> {
+  const database = await openFaceCacheDb();
+  if (!database) {
+    return null;
+  }
+
+  return new Promise<CachedFace[] | null>((resolve) => {
+    let settled = false;
+    const finish = (value: CachedFace[] | null) => {
+      if (!settled) {
+        settled = true;
+        resolve(value);
+      }
+    };
+
+    const transaction = database.transaction(FACE_CACHE_STORE, "readonly");
+    const request = transaction
+      .objectStore(FACE_CACHE_STORE)
+      .get(faceCacheKey(fileHash));
+
+    request.onsuccess = () => {
+      const result = request.result;
+      if (Array.isArray(result)) {
+        finish(result as CachedFace[]);
+        return;
+      }
+      finish(null);
+    };
+
+    request.onerror = () => {
+      finish(null);
+    };
+
+    transaction.onabort = () => {
+      finish(null);
+    };
+  });
+}
+
+async function writeFacesToCache(
+  fileHash: string,
+  faces: CachedFace[],
+): Promise<void> {
+  const database = await openFaceCacheDb();
+  if (!database) {
+    return;
+  }
+
+  return new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (!settled) {
+        settled = true;
+        resolve();
+      }
+    };
+
+    const transaction = database.transaction(FACE_CACHE_STORE, "readwrite");
+    transaction
+      .objectStore(FACE_CACHE_STORE)
+      .put(faces, faceCacheKey(fileHash));
     transaction.oncomplete = finish;
     transaction.onerror = finish;
     transaction.onabort = finish;
@@ -1457,12 +1586,45 @@ export async function analyzeFamilyPhotosInBrowser(
   }
 
   const start = performance.now();
-  await preloadModelsInBrowser();
   const faces: FamilyFaceSample[] = [];
+  let needsInference = false;
+
+  // Hash all files upfront and check cache
+  const fileHashes: string[] = [];
+  const cachedResults: (CachedFace[] | null)[] = [];
+  for (const file of files) {
+    const hash = await hashFileBytes(file.bytes);
+    fileHashes.push(hash);
+    cachedResults.push(await readFacesFromCache(hash));
+  }
+
+  needsInference = cachedResults.some((cached) => cached === null);
+  if (needsInference) {
+    await preloadModelsInBrowser();
+  }
 
   for (let photoIndex = 0; photoIndex < files.length; photoIndex += 1) {
+    const cached = cachedResults[photoIndex];
+
+    if (cached) {
+      for (let faceIndex = 0; faceIndex < cached.length; faceIndex += 1) {
+        const cf = cached[faceIndex];
+        faces.push({
+          id: `face_${photoIndex}_${faceIndex}`,
+          photoIndex,
+          embedding: new Float32Array(cf.embedding),
+          landmark3d68: cf.landmark3d68,
+          bbox: cf.bbox,
+          detScore: cf.detScore,
+          thumbnail: cf.thumbnail,
+        });
+      }
+      continue;
+    }
+
     const image = await decodeAndResizeImage(files[photoIndex]);
     const detections = await detectFaces(image, FAMILY_FACE_CONFIDENCE_THRESHOLD);
+    const photoFaces: CachedFace[] = [];
     let faceIndex = 0;
 
     for (const detection of detections) {
@@ -1482,13 +1644,23 @@ export async function analyzeFamilyPhotosInBrowser(
         bbox: detection.bbox,
         detScore: detection.score,
       });
+      photoFaces.push({
+        bbox: detection.bbox,
+        detScore: detection.score,
+        embedding: embedding.buffer.slice(0) as ArrayBuffer,
+        landmark3d68,
+        thumbnail,
+      });
       faceIndex += 1;
     }
 
     releaseCanvas(image);
+    writeFacesToCache(fileHashes[photoIndex], photoFaces);
   }
 
-  await releaseInferenceSessions();
+  if (needsInference) {
+    await releaseInferenceSessions();
+  }
 
   if (faces.length === 0) {
     throw new Error("No usable faces found in the uploaded photos");
