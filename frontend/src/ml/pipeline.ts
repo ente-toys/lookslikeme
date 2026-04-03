@@ -1,4 +1,5 @@
 import * as ort from "onnxruntime-web";
+import heic2any from "heic2any";
 
 import type {
   ComparisonResult,
@@ -894,11 +895,27 @@ async function decodeAndResizeImage(file: WorkerFile): Promise<OffscreenCanvas> 
     });
   } catch {
     if (mimeType === "image/heic") {
-      throw new Error(
-        `HEIC photos are not supported on this browser. Please convert ${file.name || "the photo"} to JPEG first.`,
-      );
+      // Browser can't decode HEIC natively — convert via heic2any
+      try {
+        const jpegBlob = await heic2any({
+          blob,
+          toType: "image/jpeg",
+          quality: 0.9,
+        });
+        const converted = Array.isArray(jpegBlob) ? jpegBlob[0] : jpegBlob;
+        bitmap = await createImageBitmap(converted, {
+          colorSpaceConversion: "none",
+          imageOrientation: "none",
+          premultiplyAlpha: "none",
+        });
+      } catch {
+        throw new Error(
+          `Failed to convert HEIC photo ${file.name || "upload"}. Try converting it to JPEG first.`,
+        );
+      }
+    } else {
+      throw new Error(`Failed to decode image ${file.name || "upload"}`);
     }
-    throw new Error(`Failed to decode image ${file.name || "upload"}`);
   }
 
   if (bitmap.width * bitmap.height > MAX_IMAGE_PIXELS) {
