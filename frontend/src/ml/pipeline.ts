@@ -80,9 +80,9 @@ const ARC_FACE_DESTINATION: Array<[number, number]> = [
 ];
 
 const MAGIC_HEADERS = [
-  Uint8Array.from([0xff, 0xd8, 0xff]),
-  Uint8Array.from([0x89, 0x50, 0x4e, 0x47]),
-  Uint8Array.from([0x52, 0x49, 0x46, 0x46]),
+  Uint8Array.from([0xff, 0xd8, 0xff]),       // JPEG
+  Uint8Array.from([0x89, 0x50, 0x4e, 0x47]), // PNG
+  Uint8Array.from([0x52, 0x49, 0x46, 0x46]), // WebP (RIFF)
 ];
 
 type WorkerFile = {
@@ -833,8 +833,22 @@ export async function preloadModelsInBrowser(
   }
 }
 
+function isHeicFile(bytes: Uint8Array): boolean {
+  if (bytes.length < 12) return false;
+  // HEIC/HEIF: bytes 4-7 are "ftyp", followed by brand like "heic", "heix", "mif1", etc.
+  return (
+    bytes[4] === 0x66 &&  // f
+    bytes[5] === 0x74 &&  // t
+    bytes[6] === 0x79 &&  // y
+    bytes[7] === 0x70     // p
+  );
+}
+
 function hasSupportedMagic(bytes: Uint8Array): boolean {
-  return MAGIC_HEADERS.some((magic) => magic.every((value, index) => bytes[index] === value));
+  if (MAGIC_HEADERS.some((magic) => magic.every((value, index) => bytes[index] === value))) {
+    return true;
+  }
+  return isHeicFile(bytes);
 }
 
 function inferMimeType(bytes: Uint8Array, fallback: string): string {
@@ -846,6 +860,9 @@ function inferMimeType(bytes: Uint8Array, fallback: string): string {
   }
   if (bytes[0] === 0xff && bytes[1] === 0xd8) {
     return "image/jpeg";
+  }
+  if (isHeicFile(bytes)) {
+    return "image/heic";
   }
   return fallback || "image/jpeg";
 }
@@ -865,7 +882,8 @@ function validateImageBytes(file: WorkerFile): Uint8Array {
 
 async function decodeAndResizeImage(file: WorkerFile): Promise<OffscreenCanvas> {
   const bytes = validateImageBytes(file);
-  const blob = new Blob([file.bytes], { type: inferMimeType(bytes, file.type) });
+  const mimeType = inferMimeType(bytes, file.type);
+  const blob = new Blob([file.bytes], { type: mimeType });
 
   let bitmap: ImageBitmap;
   try {
@@ -875,6 +893,11 @@ async function decodeAndResizeImage(file: WorkerFile): Promise<OffscreenCanvas> 
       premultiplyAlpha: "none",
     });
   } catch {
+    if (mimeType === "image/heic") {
+      throw new Error(
+        `HEIC photos are not supported on this browser. Please convert ${file.name || "the photo"} to JPEG first.`,
+      );
+    }
     throw new Error(`Failed to decode image ${file.name || "upload"}`);
   }
 

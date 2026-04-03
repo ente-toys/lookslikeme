@@ -153,7 +153,7 @@ export function FamilyPhotoForm({ loading, onAnalyze, onPhotosAdded }: Props) {
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
-    accept: { "image/*": [] },
+    accept: { "image/*": [], "image/heic": [".heic", ".heif"] },
     maxSize: 10 * 1024 * 1024,
     maxFiles: MAX_UPLOAD_IMAGES,
     noClick: isMobilePicker,

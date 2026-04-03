@@ -78,9 +78,23 @@ type PendingRequest = {
 const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
 const pending = new Map<string, PendingRequest>();
 
+function isMobileDevice(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
+  }
+  return window.matchMedia("(max-width: 768px), (pointer: coarse)").matches;
+}
+
 function getPreferredModelFamily(): "buffalo_l" | "buffalo_s" {
   if (typeof window === "undefined") {
     return "buffalo_l";
+  }
+
+  const mobile = isMobileDevice();
+
+  // Always use the small model on mobile regardless of overrides
+  if (mobile) {
+    return "buffalo_s";
   }
 
   const params = new URLSearchParams(window.location.search);
@@ -93,11 +107,6 @@ function getPreferredModelFamily(): "buffalo_l" | "buffalo_s" {
   const storedValue = window.localStorage.getItem("llu:model-family");
   if (storedValue === "buffalo_l" || storedValue === "buffalo_s") {
     return storedValue;
-  }
-
-  if (typeof window.matchMedia === "function") {
-    const prefersSmallModel = window.matchMedia("(max-width: 768px), (pointer: coarse)").matches;
-    return prefersSmallModel ? "buffalo_s" : "buffalo_l";
   }
 
   return "buffalo_l";
