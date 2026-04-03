@@ -25,6 +25,8 @@ const FAMILY_CLUSTER_MERGE_THRESHOLD = 0.2;
 const FAMILY_CLUSTER_PAIR_FLOOR = 0.05;
 const FAMILY_CLUSTER_LOW_CONFIDENCE_THRESHOLD = 0.65;
 const MAX_STORED_FAMILY_SESSIONS = 4;
+const MOBILE_THUMBNAIL_SIZE = 160;
+const DESKTOP_THUMBNAIL_SIZE = 256;
 
 const DETECTOR_INPUT_SIZE = 640;
 const RECOGNITION_INPUT_SIZE = 112;
@@ -236,6 +238,17 @@ function get2dContext(canvas: OffscreenCanvas): OffscreenCanvasRenderingContext2
     throw new Error("Failed to create 2D canvas context");
   }
   return context;
+}
+
+function releaseCanvas(canvas: OffscreenCanvas) {
+  canvas.width = 0;
+  canvas.height = 0;
+}
+
+function getThumbnailSize(): number {
+  return activeModelFamily === "buffalo_s"
+    ? MOBILE_THUMBNAIL_SIZE
+    : DESKTOP_THUMBNAIL_SIZE;
 }
 
 function emitModelPreloadProgress(stage: string, loadedBytes: number, totalBytes: number) {
@@ -1090,8 +1103,8 @@ async function extractLandmark3d68(source: OffscreenCanvas, detection: Detection
 async function makeFaceThumbnailDataUrl(
   source: OffscreenCanvas,
   bbox: BBox,
-  size = 256,
 ): Promise<string> {
+  const size = getThumbnailSize();
   const [x1, y1, x2, y2] = bbox;
   const width = Math.max(1, x2 - x1);
   const height = Math.max(1, y2 - y1);
@@ -1104,6 +1117,7 @@ async function makeFaceThumbnailDataUrl(
   const cropX = Math.min(Math.max(0, centerX - side / 2), Math.max(0, source.width - side));
   const cropY = Math.min(Math.max(0, centerY - side / 2), Math.max(0, source.height - side));
 
+  const quality = activeModelFamily === "buffalo_s" ? 0.7 : 0.85;
   const canvas = new OffscreenCanvas(size, size);
   const context = get2dContext(canvas);
   context.fillStyle = "black";
@@ -1111,7 +1125,8 @@ async function makeFaceThumbnailDataUrl(
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
   context.drawImage(source, cropX, cropY, side, side, 0, 0, size, size);
-  const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.85 });
+  const blob = await canvas.convertToBlob({ type: "image/jpeg", quality });
+  releaseCanvas(canvas);
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let binary = "";
   const chunkSize = 0x8000;
@@ -1444,6 +1459,8 @@ export async function analyzeFamilyPhotosInBrowser(
       });
       faceIndex += 1;
     }
+
+    releaseCanvas(image);
   }
 
   if (faces.length === 0) {
