@@ -1,0 +1,16 @@
+sample_data/
+__pycache__/
+*.pyc
+.venv/
+.venv312/
+venv/
+*.egg-info/
+dist/
+build/
+.env
+node_modules/
+frontend/dist/
+frontend/public/models/
+.DS_Store
+*.onnx
+/models/
