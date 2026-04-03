@@ -187,6 +187,31 @@ function resetModelState() {
   };
 }
 
+async function releaseInferenceSessions() {
+  const sessions = await Promise.allSettled([
+    detectorSessionPromise,
+    recognitionSessionPromise,
+    landmarkSessionPromise,
+  ]);
+  for (const result of sessions) {
+    if (result.status === "fulfilled" && result.value) {
+      try {
+        await result.value.release();
+      } catch {
+        // already released
+      }
+    }
+  }
+  detectorSessionPromise = null;
+  recognitionSessionPromise = null;
+  landmarkSessionPromise = null;
+  modelsReadyPromise = null;
+  detectorModelBytes = null;
+  recognitionModelBytes = null;
+  landmarkModelBytes = null;
+  anchorCenterCache.clear();
+}
+
 export function setBrowserModelFamily(modelFamily: ModelFamily) {
   if (activeModelFamily === modelFamily) {
     return;
@@ -1462,6 +1487,8 @@ export async function analyzeFamilyPhotosInBrowser(
 
     releaseCanvas(image);
   }
+
+  await releaseInferenceSessions();
 
   if (faces.length === 0) {
     throw new Error("No usable faces found in the uploaded photos");
