@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import type { ComparisonResult, PairwiseComparison, PersonInfo } from "../types";
+import { FamilyCard } from "./FamilyCard";
 import { FeatureBreakdownPanel } from "./FeatureBreakdownPanel";
 import { PersonAvatar } from "./PersonAvatar";
 import { ScoreBar } from "./ScoreBar";
@@ -966,6 +967,11 @@ export function ResultsPanel({ result, onReset }: Props) {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Family overview card */}
+      {result.persons.length > 2 && (
+        <FamilyCard result={result} />
       )}
 
       <div className="text-center">
