@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
+import { areAllFilesCached } from "../utils/faceCache";
 
 interface Props {
   loading: boolean;
+  modelsReady: boolean;
   onAnalyze: (files: File[]) => void;
   onPhotosAdded?: () => void;
 }
@@ -96,8 +98,9 @@ async function clearCachedPhotos(): Promise<void> {
   }
 }
 
-export function FamilyPhotoForm({ loading, onAnalyze, onPhotosAdded }: Props) {
+export function FamilyPhotoForm({ loading, modelsReady, onAnalyze, onPhotosAdded }: Props) {
   const [files, setFiles] = useState<File[]>([]);
+  const [allCached, setAllCached] = useState(false);
   const [isMobilePicker, setIsMobilePicker] = useState(prefersMobilePicker);
   const cacheLoaded = useRef(false);
 
@@ -121,6 +124,19 @@ export function FamilyPhotoForm({ loading, onAnalyze, onPhotosAdded }: Props) {
     } else {
       clearCachedPhotos();
     }
+  }, [files]);
+
+  // Check if all current files have cached face data
+  useEffect(() => {
+    if (files.length < 2) {
+      setAllCached(false);
+      return;
+    }
+    let cancelled = false;
+    areAllFilesCached(files).then((result) => {
+      if (!cancelled) setAllCached(result);
+    });
+    return () => { cancelled = true; };
   }, [files]);
 
   const onDrop = useCallback((accepted: File[]) => {
@@ -164,12 +180,15 @@ export function FamilyPhotoForm({ loading, onAnalyze, onPhotosAdded }: Props) {
     setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index));
   };
 
-  const ctaDisabled = loading || files.length < 2;
+  const ready = modelsReady || allCached;
+  const ctaDisabled = loading || files.length < 2 || !ready;
   const ctaLabel = loading
     ? "Scanning faces..."
     : files.length < 2
       ? "Add at least 2 photos"
-      : "Show me the resemblance";
+      : !ready
+        ? "Preparing models…"
+        : "Show me the resemblance";
 
   return (
     <div className="space-y-5">

@@ -451,7 +451,7 @@ function App() {
         ) : result ? (
           <ResultsPanel result={result} onReset={handleReset} />
         ) : (
-          <FamilyPhotoForm loading={loading} onAnalyze={handleFamilyAnalyze} onPhotosAdded={startModelPreload} />
+          <FamilyPhotoForm loading={loading} modelsReady={modelPreloadState?.status === "ready"} onAnalyze={handleFamilyAnalyze} onPhotosAdded={startModelPreload} />
         )}
 
         <p className="mt-8 text-center text-xs text-neutral-400">v{__APP_VERSION__}</p>
