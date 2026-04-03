@@ -917,13 +917,8 @@ export function ResultsPanel({ result, onReset }: Props) {
             </div>
           )}
 
-          {/* Branding */}
-          <div className="border-t border-[var(--border)] bg-[var(--warm-white)] px-6 pt-3 pb-0 text-center">
-            <a href="https://lookslikeme.fyi" className="text-[11px] text-[var(--text-muted)] hover:text-[var(--terracotta)] transition-colors">lookslikeme.fyi</a>
-          </div>
-
           {/* Action buttons */}
-          <div className="flex gap-2.5 bg-[var(--warm-white)] px-6 pt-2 pb-4">
+          <div className="flex gap-2.5 border-t border-[var(--border)] bg-[var(--warm-white)] px-6 pt-4 pb-4">
             <button
               type="button"
               onClick={handleCopyImage}
