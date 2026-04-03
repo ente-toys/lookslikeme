@@ -1,5 +1,4 @@
 import * as ort from "onnxruntime-web";
-import heic2any from "heic2any";
 
 import type {
   ComparisonResult,
@@ -897,6 +896,11 @@ async function decodeAndResizeImage(file: WorkerFile): Promise<OffscreenCanvas> 
     if (mimeType === "image/heic") {
       // Browser can't decode HEIC natively — convert via heic2any
       try {
+        // heic2any references `window` at load time; polyfill for worker
+        if (typeof window === "undefined") {
+          (globalThis as unknown as Record<string, unknown>).window = globalThis;
+        }
+        const { default: heic2any } = await import("heic2any");
         const jpegBlob = await heic2any({
           blob,
           toType: "image/jpeg",
