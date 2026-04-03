@@ -258,12 +258,11 @@ export function FamilyPhotoForm({ loading, modelPreloadState, onAnalyze, onPhoto
 
   const modelsReady = modelPreloadState?.status === "ready";
   const ready = modelsReady || allCached;
+  const waiting = files.length >= 2 && !ready && !loading && converting === null;
   const ctaDisabled = loading || files.length < 2 || !ready || converting !== null;
-  const ctaLabel = loading
-    ? "Scanning faces..."
-    : files.length < 2
-      ? "Add at least 2 photos"
-      : "Show me the resemblance";
+  const ctaLabel = files.length < 2
+    ? "Add at least 2 photos"
+    : "Show me the resemblance";
 
   const showModelStatus = files.length >= 2 && !allCached && modelPreloadState && modelPreloadState.status !== "error";
   const modelProgress = modelPreloadState && "progress" in modelPreloadState ? modelPreloadState.progress : null;
@@ -471,10 +470,16 @@ export function FamilyPhotoForm({ loading, modelPreloadState, onAnalyze, onPhoto
           type="button"
           onClick={() => onAnalyze(files)}
           disabled={ctaDisabled}
-          className="flex w-full items-center justify-center gap-2.5 rounded-2xl border-none px-5 py-[18px] text-base font-semibold transition-all theme-primary-button disabled:cursor-not-allowed"
+          className="flex w-full items-center justify-center gap-2.5 rounded-2xl border-none px-5 py-[18px] text-base font-semibold theme-primary-button disabled:cursor-not-allowed"
         >
+          {waiting && (
+            <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          )}
           {ctaLabel}
-          {!loading && (
+          {!waiting && !loading && (
             <svg
               width="18"
               height="18"
@@ -484,7 +489,6 @@ export function FamilyPhotoForm({ loading, modelPreloadState, onAnalyze, onPhoto
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="transition-transform group-hover:translate-x-0.5"
             >
               <line x1="5" y1="12" x2="19" y2="12" />
               <polyline points="12 5 19 12 12 19" />
