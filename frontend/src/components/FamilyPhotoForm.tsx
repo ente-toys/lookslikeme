@@ -50,48 +50,72 @@ async function cachePhotos(files: File[]): Promise<void> {
   const db = await openPhotoCacheDb();
   if (!db) return;
   try {
-    const entries = await Promise.all(
-      files.map(async (file) => ({
-        name: file.name,
-        type: file.type,
-        lastModified: file.lastModified,
-        buffer: await file.arrayBuffer(),
-      })),
-    );
     const tx = db.transaction(PHOTO_CACHE_STORE, "readwrite");
-    tx.objectStore(PHOTO_CACHE_STORE).put(entries, "last-photos");
+    const store = tx.objectStore(PHOTO_CACHE_STORE);
+    // Store count + individual files for fast incremental loading
+    store.put(files.length, "photo-count");
+    await Promise.all(
+      files.map(async (file, i) => {
+        store.put(
+          {
+            name: file.name,
+            type: file.type,
+            lastModified: file.lastModified,
+            buffer: await file.arrayBuffer(),
+          },
+          `photo-${i}`,
+        );
+      }),
+    );
+    // Clean up stale keys beyond current count
+    for (let i = files.length; i < MAX_UPLOAD_IMAGES; i++) {
+      store.delete(`photo-${i}`);
+    }
+    // Remove legacy key
+    store.delete("last-photos");
   } catch {
     // cache write failed, not critical
   }
 }
 
-async function loadCachedPhotos(): Promise<File[]> {
+async function loadCachedPhotos(
+  onFile: (file: File) => void,
+): Promise<void> {
   const db = await openPhotoCacheDb();
-  if (!db) return [];
-  return new Promise((resolve) => {
+  if (!db) return;
+
+  const count = await new Promise<number>((resolve) => {
     try {
       const tx = db.transaction(PHOTO_CACHE_STORE, "readonly");
-      const request = tx.objectStore(PHOTO_CACHE_STORE).get("last-photos");
-      request.onsuccess = () => {
-        const entries = request.result;
-        if (!Array.isArray(entries) || entries.length === 0) {
-          resolve([]);
-          return;
-        }
-        const files = entries.map(
-          (entry: { name: string; type: string; lastModified: number; buffer: ArrayBuffer }) =>
-            new File([entry.buffer], entry.name, {
-              type: entry.type,
-              lastModified: entry.lastModified,
-            }),
-        );
-        resolve(files);
-      };
-      request.onerror = () => resolve([]);
+      const request = tx.objectStore(PHOTO_CACHE_STORE).get("photo-count");
+      request.onsuccess = () => resolve(typeof request.result === "number" ? request.result : 0);
+      request.onerror = () => resolve(0);
     } catch {
-      resolve([]);
+      resolve(0);
     }
   });
+
+  if (count === 0) return;
+
+  for (let i = 0; i < count; i++) {
+    const entry = await new Promise<{ name: string; type: string; lastModified: number; buffer: ArrayBuffer } | null>((resolve) => {
+      try {
+        const tx = db.transaction(PHOTO_CACHE_STORE, "readonly");
+        const request = tx.objectStore(PHOTO_CACHE_STORE).get(`photo-${i}`);
+        request.onsuccess = () => resolve(request.result ?? null);
+        request.onerror = () => resolve(null);
+      } catch {
+        resolve(null);
+      }
+    });
+
+    if (entry) {
+      onFile(new File([entry.buffer], entry.name, {
+        type: entry.type,
+        lastModified: entry.lastModified,
+      }));
+    }
+  }
 }
 
 async function clearCachedPhotos(): Promise<void> {
@@ -99,7 +123,12 @@ async function clearCachedPhotos(): Promise<void> {
   if (!db) return;
   try {
     const tx = db.transaction(PHOTO_CACHE_STORE, "readwrite");
-    tx.objectStore(PHOTO_CACHE_STORE).delete("last-photos");
+    const store = tx.objectStore(PHOTO_CACHE_STORE);
+    store.delete("photo-count");
+    for (let i = 0; i < MAX_UPLOAD_IMAGES; i++) {
+      store.delete(`photo-${i}`);
+    }
+    store.delete("last-photos");
   } catch {
     // not critical
   }
@@ -115,22 +144,27 @@ export function FamilyPhotoForm({ loading, modelPreloadState, onAnalyze, onPhoto
   const [converting, setConverting] = useState<{ done: number; total: number } | null>(null);
   const [isMobilePicker, setIsMobilePicker] = useState(prefersMobilePicker);
   const cacheLoaded = useRef(false);
+  const cacheRestored = useRef(false);
 
-  // Load cached photos on mount
+  // Load cached photos on mount — incrementally
   useEffect(() => {
     if (cacheLoaded.current) return;
     cacheLoaded.current = true;
-    loadCachedPhotos().then((cached) => {
-      if (cached.length > 0) {
-        setFiles(cached);
+    let first = true;
+    loadCachedPhotos((file) => {
+      if (first) {
+        first = false;
         onPhotosAdded?.();
       }
+      setFiles((prev) => [...prev, file]);
+    }).then(() => {
+      cacheRestored.current = true;
     });
   }, [onPhotosAdded]);
 
-  // Cache photos whenever they change
+  // Cache photos whenever they change (skip during initial restore)
   useEffect(() => {
-    if (!cacheLoaded.current) return;
+    if (!cacheRestored.current) return;
     if (files.length > 0) {
       cachePhotos(files);
     } else {
