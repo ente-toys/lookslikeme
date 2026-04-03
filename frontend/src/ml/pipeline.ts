@@ -155,9 +155,13 @@ function getActiveModelPack() {
   return MODEL_PACKS[activeModelFamily];
 }
 
+function useLandmarkModel(): boolean {
+  return activeModelFamily !== "buffalo_s";
+}
+
 function getActiveModelSpecs(): ModelSpec[] {
   const pack = getActiveModelPack();
-  return [
+  const specs: ModelSpec[] = [
     {
       key: "detector",
       label: "Face detector",
@@ -168,12 +172,15 @@ function getActiveModelSpecs(): ModelSpec[] {
       label: "Face embeddings",
       url: `${pack.baseUrl}/${pack.recognitionFile}`,
     },
-    {
+  ];
+  if (useLandmarkModel()) {
+    specs.push({
       key: "landmark",
       label: "Landmarks",
       url: `${pack.baseUrl}/1k3d68.onnx`,
-    },
-  ];
+    });
+  }
+  return specs;
 }
 
 function resetModelState() {
@@ -628,7 +635,8 @@ async function readModelResponseBytes(
 }
 
 async function ensureModelBuffers(forceRefresh = false): Promise<void> {
-  if (detectorModelBytes && recognitionModelBytes && landmarkModelBytes) {
+  const landmarkNeeded = useLandmarkModel();
+  if (detectorModelBytes && recognitionModelBytes && (!landmarkNeeded || landmarkModelBytes)) {
     return;
   }
 
@@ -801,7 +809,7 @@ export async function preloadModelsInBrowser(
         emitModelPreloadProgress("Initializing models", totalBytes, totalBytes);
         await getDetectorSession();
         await getRecognitionSession();
-        await getLandmarkSession();
+        if (useLandmarkModel()) await getLandmarkSession();
         emitModelPreloadProgress("Models ready", totalBytes, totalBytes);
       } catch (error) {
         modelsReadyPromise = null;
@@ -818,7 +826,7 @@ export async function preloadModelsInBrowser(
           emitModelPreloadProgress("Retrying model initialization", totalBytes, totalBytes);
           await getDetectorSession();
           await getRecognitionSession();
-          await getLandmarkSession();
+          if (useLandmarkModel()) await getLandmarkSession();
           emitModelPreloadProgress("Models ready", totalBytes, totalBytes);
           return;
         }
@@ -1651,7 +1659,9 @@ export async function analyzeFamilyPhotosInBrowser(
       }
 
       const embedding = await extractEmbedding(image, detection);
-      const landmark3d68 = await extractLandmark3d68(image, detection);
+      const landmark3d68 = useLandmarkModel()
+        ? await extractLandmark3d68(image, detection)
+        : null;
       const thumbnail = await makeFaceThumbnailDataUrl(image, detection.bbox);
       faces.push({
         id: `face_${photoIndex}_${faceIndex}`,
