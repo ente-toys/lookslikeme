@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { areAllFilesCached } from "../utils/faceCache";
+import { isHeicFile, convertHeicToJpeg } from "../utils/heicConvert";
 import type { ModelPreloadProgress } from "../types";
 
 type ModelPreloadState =
@@ -111,6 +112,7 @@ function formatMB(bytes: number): string {
 export function FamilyPhotoForm({ loading, modelPreloadState, onAnalyze, onPhotosAdded }: Props) {
   const [files, setFiles] = useState<File[]>([]);
   const [allCached, setAllCached] = useState(false);
+  const [converting, setConverting] = useState<{ done: number; total: number } | null>(null);
   const [isMobilePicker, setIsMobilePicker] = useState(prefersMobilePicker);
   const cacheLoaded = useRef(false);
 
@@ -149,14 +151,44 @@ export function FamilyPhotoForm({ loading, modelPreloadState, onAnalyze, onPhoto
     return () => { cancelled = true; };
   }, [files]);
 
-  const onDrop = useCallback((accepted: File[]) => {
-    setFiles((current) => {
-      const next = [...current, ...accepted].slice(0, MAX_UPLOAD_IMAGES);
-      if (current.length === 0 && next.length > 0) {
-        onPhotosAdded?.();
+  const onDrop = useCallback(async (accepted: File[]) => {
+    const heicFiles = accepted.filter(isHeicFile);
+    const nonHeicFiles = accepted.filter((f) => !isHeicFile(f));
+
+    if (heicFiles.length === 0) {
+      setFiles((current) => {
+        const next = [...current, ...nonHeicFiles].slice(0, MAX_UPLOAD_IMAGES);
+        if (current.length === 0 && next.length > 0) onPhotosAdded?.();
+        return next;
+      });
+      return;
+    }
+
+    // Add non-HEIC files immediately
+    if (nonHeicFiles.length > 0) {
+      setFiles((current) => {
+        const next = [...current, ...nonHeicFiles].slice(0, MAX_UPLOAD_IMAGES);
+        if (current.length === 0 && next.length > 0) onPhotosAdded?.();
+        return next;
+      });
+    }
+
+    // Convert HEIC files one by one with progress
+    setConverting({ done: 0, total: heicFiles.length });
+    for (let i = 0; i < heicFiles.length; i++) {
+      try {
+        const converted = await convertHeicToJpeg(heicFiles[i]);
+        setFiles((current) => {
+          const next = [...current, converted].slice(0, MAX_UPLOAD_IMAGES);
+          if (current.length === 0 && next.length > 0) onPhotosAdded?.();
+          return next;
+        });
+      } catch {
+        // Skip files that fail to convert
       }
-      return next;
-    });
+      setConverting({ done: i + 1, total: heicFiles.length });
+    }
+    setConverting(null);
   }, [onPhotosAdded]);
 
   useEffect(() => {
@@ -192,7 +224,7 @@ export function FamilyPhotoForm({ loading, modelPreloadState, onAnalyze, onPhoto
 
   const modelsReady = modelPreloadState?.status === "ready";
   const ready = modelsReady || allCached;
-  const ctaDisabled = loading || files.length < 2 || !ready;
+  const ctaDisabled = loading || files.length < 2 || !ready || converting !== null;
   const ctaLabel = loading
     ? "Scanning faces..."
     : files.length < 2
@@ -359,9 +391,24 @@ export function FamilyPhotoForm({ loading, modelPreloadState, onAnalyze, onPhoto
         )}
       </div>
 
-      {/* Model status + CTA Button */}
+      {/* Status + CTA Button */}
       <div style={{ animation: "cardIn 0.5s ease 0.5s backwards" }}>
-        {showModelStatus && !modelsReady && modelProgress && (
+        {converting && (
+          <div className="mb-3 rounded-xl bg-[rgba(92,61,46,0.05)] px-4 py-3">
+            <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
+              <span>Converting HEIC to JPEG…</span>
+              <span>{converting.done} / {converting.total}</span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[rgba(255,255,255,0.9)]">
+              <div
+                className="h-full rounded-full bg-[var(--terracotta)] transition-all duration-300"
+                style={{ width: `${Math.max(4, (converting.done / converting.total) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {!converting && showModelStatus && !modelsReady && modelProgress && (
           <div className="mb-3 rounded-xl bg-[rgba(92,61,46,0.05)] px-4 py-3">
             <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
               <span>{modelProgress.stage}</span>

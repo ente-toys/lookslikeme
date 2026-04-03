@@ -170,43 +170,13 @@ function getWorker(): Worker {
   return worker;
 }
 
-function isHeicFile(file: File): boolean {
-  if (file.type === "image/heic" || file.type === "image/heif") return true;
-  const name = file.name.toLowerCase();
-  return name.endsWith(".heic") || name.endsWith(".heif");
-}
-
-async function convertHeicToJpeg(file: File): Promise<File> {
-  const heic2any = (await import("heic2any")).default;
-  const result = await heic2any({
-    blob: file,
-    toType: "image/jpeg",
-    quality: 0.9,
-  });
-  const jpegBlob = Array.isArray(result) ? result[0] : result;
-  const jpegName = file.name.replace(/\.heic$/i, ".jpg").replace(/\.heif$/i, ".jpg");
-  return new File([jpegBlob], jpegName, { type: "image/jpeg" });
-}
-
 async function serializeFiles(files: File[]): Promise<SerializedFile[]> {
   return Promise.all(
-    files.map(async (file) => {
-      let resolved = file;
-      if (isHeicFile(file)) {
-        try {
-          resolved = await convertHeicToJpeg(file);
-        } catch {
-          throw new Error(
-            `Failed to convert ${file.name} from HEIC. Try converting it to JPEG first.`,
-          );
-        }
-      }
-      return {
-        name: resolved.name,
-        type: resolved.type,
-        bytes: await resolved.arrayBuffer(),
-      };
-    }),
+    files.map(async (file) => ({
+      name: file.name,
+      type: file.type,
+      bytes: await file.arrayBuffer(),
+    })),
   );
 }
 
