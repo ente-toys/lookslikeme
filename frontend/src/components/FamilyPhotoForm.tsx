@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { areAllFilesCached } from "../utils/faceCache";
+import type { ModelPreloadProgress } from "../types";
+
+type ModelPreloadState =
+  | { status: "loading"; progress: ModelPreloadProgress }
+  | { status: "ready"; progress: ModelPreloadProgress }
+  | { status: "error"; message: string };
 
 interface Props {
   loading: boolean;
-  modelsReady: boolean;
+  modelPreloadState: ModelPreloadState | null;
   onAnalyze: (files: File[]) => void;
   onPhotosAdded?: () => void;
 }
@@ -98,7 +104,11 @@ async function clearCachedPhotos(): Promise<void> {
   }
 }
 
-export function FamilyPhotoForm({ loading, modelsReady, onAnalyze, onPhotosAdded }: Props) {
+function formatMB(bytes: number): string {
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+export function FamilyPhotoForm({ loading, modelPreloadState, onAnalyze, onPhotosAdded }: Props) {
   const [files, setFiles] = useState<File[]>([]);
   const [allCached, setAllCached] = useState(false);
   const [isMobilePicker, setIsMobilePicker] = useState(prefersMobilePicker);
@@ -180,15 +190,20 @@ export function FamilyPhotoForm({ loading, modelsReady, onAnalyze, onPhotosAdded
     setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index));
   };
 
+  const modelsReady = modelPreloadState?.status === "ready";
   const ready = modelsReady || allCached;
   const ctaDisabled = loading || files.length < 2 || !ready;
   const ctaLabel = loading
     ? "Scanning faces..."
     : files.length < 2
       ? "Add at least 2 photos"
-      : !ready
-        ? "Preparing models…"
-        : "Show me the resemblance";
+      : "Show me the resemblance";
+
+  const showModelStatus = files.length >= 2 && !allCached && modelPreloadState && modelPreloadState.status !== "error";
+  const modelProgress = modelPreloadState && "progress" in modelPreloadState ? modelPreloadState.progress : null;
+  const progressPct = modelProgress && modelProgress.total_bytes > 0
+    ? Math.min(100, (modelProgress.loaded_bytes / modelProgress.total_bytes) * 100)
+    : 0;
 
   return (
     <div className="space-y-5">
@@ -344,8 +359,33 @@ export function FamilyPhotoForm({ loading, modelsReady, onAnalyze, onPhotosAdded
         )}
       </div>
 
-      {/* CTA Button */}
+      {/* Model status + CTA Button */}
       <div style={{ animation: "cardIn 0.5s ease 0.5s backwards" }}>
+        {showModelStatus && !modelsReady && modelProgress && (
+          <div className="mb-3 rounded-xl bg-[rgba(92,61,46,0.05)] px-4 py-3">
+            <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
+              <span>{modelProgress.stage}</span>
+              {modelProgress.total_bytes > 0 && (
+                <span>{formatMB(modelProgress.loaded_bytes)} / {formatMB(modelProgress.total_bytes)}</span>
+              )}
+            </div>
+            {modelProgress.total_bytes > 0 && (
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[rgba(255,255,255,0.9)]">
+                <div
+                  className="h-full rounded-full bg-[var(--terracotta)] transition-all duration-300"
+                  style={{ width: `${Math.max(4, progressPct)}%` }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {modelPreloadState?.status === "error" && (
+          <div className="mb-3 rounded-xl border border-[rgba(212,96,58,0.28)] bg-[rgba(255,247,240,0.92)] px-4 py-3 text-xs text-[var(--terracotta)]">
+            Model download failed. Please refresh and try again.
+          </div>
+        )}
+
         <button
           type="button"
           onClick={() => onAnalyze(files)}

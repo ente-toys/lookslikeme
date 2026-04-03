@@ -58,30 +58,6 @@ function debugLog(event: string, details?: Record<string, unknown>) {
   console.info(`[LLU] ${event}`, details ?? {});
 }
 
-function formatMegabytes(bytes: number): string {
-  return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
-}
-
-function formatModelProgressSummary(state: ModelPreloadState): string {
-  if (state.status === "error") {
-    return state.message;
-  }
-
-  const { loaded_bytes: loadedBytes, total_bytes: totalBytes } = state.progress;
-  if (totalBytes > 0) {
-    return `${formatMegabytes(loadedBytes)} of ${formatMegabytes(totalBytes)}`;
-  }
-
-  if (state.status === "ready") {
-    return "Download complete";
-  }
-
-  if (loadedBytes > 0) {
-    return `${formatMegabytes(loadedBytes)} downloaded`;
-  }
-
-  return "Preparing download";
-}
 
 function buildAutoSelections(
   clusters: Array<{ id: string; included_by_default: boolean }>,
@@ -179,7 +155,6 @@ function App() {
   const [processingVariant, setProcessingVariant] =
     useState<ProcessingOverlayVariant>("family-analysis");
   const [modelPreloadState, setModelPreloadState] = useState<ModelPreloadState | null>(null);
-  const [showModelBanner, setShowModelBanner] = useState(false);
   const modelPreloadStarted = useRef(false);
 
   // Error listeners
@@ -224,7 +199,7 @@ function App() {
         total_bytes: 0,
       },
     });
-    setShowModelBanner(true);
+
 
     preloadModels((progress) => {
       setModelPreloadState({
@@ -248,8 +223,6 @@ function App() {
             progress: { stage: "Models ready", loaded_bytes: 0, total_bytes: 0 },
           };
         });
-
-        setTimeout(() => setShowModelBanner(false), 2500);
       })
       .catch((preloadError) => {
         setModelPreloadState({
@@ -382,60 +355,6 @@ function App() {
 
         </header>
 
-        {showModelBanner && modelPreloadState && modelPreloadState.status !== "error" && (
-          <div className="theme-soft-card mb-5 rounded-[var(--radius)] px-4 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[1.8px] text-[var(--text-muted)]">
-                  On-device models
-                </p>
-                <p className="mt-1 text-sm font-medium text-[var(--text)]">
-                  {modelPreloadState.progress.stage}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  {formatModelProgressSummary(modelPreloadState)}
-                </p>
-              </div>
-
-              {modelPreloadState.status === "ready" && (
-                <span className="theme-success-pill rounded-full px-3 py-1 text-xs font-semibold">
-                  Ready
-                </span>
-              )}
-            </div>
-
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-[rgba(255,255,255,0.9)]">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${
-                  modelPreloadState.status === "ready"
-                    ? "bg-[var(--success)]"
-                    : "bg-[var(--terracotta)]"
-                }`}
-                style={{
-                  width:
-                    modelPreloadState.progress.total_bytes > 0
-                      ? `${Math.max(
-                          6,
-                          Math.min(
-                            100,
-                            (modelPreloadState.progress.loaded_bytes /
-                              modelPreloadState.progress.total_bytes) *
-                              100,
-                          ),
-                        )}%`
-                      : "18%",
-                }}
-              />
-            </div>
-          </div>
-        )}
-
-        {modelPreloadState && modelPreloadState.status === "error" && (
-          <div className="mb-5 rounded-[var(--radius-sm)] border border-[rgba(212,96,58,0.28)] bg-[rgba(255,247,240,0.92)] px-4 py-3 text-sm text-[var(--terracotta)]">
-            Model preload failed: {modelPreloadState.message}
-          </div>
-        )}
-
         {error && (
           <div className="mb-5 rounded-[var(--radius-sm)] border border-[rgba(212,96,58,0.28)] bg-[rgba(255,247,240,0.92)] p-4 text-sm text-[var(--terracotta)]">
             {error}
@@ -451,7 +370,7 @@ function App() {
         ) : result ? (
           <ResultsPanel result={result} onReset={handleReset} />
         ) : (
-          <FamilyPhotoForm loading={loading} modelsReady={modelPreloadState?.status === "ready"} onAnalyze={handleFamilyAnalyze} onPhotosAdded={startModelPreload} />
+          <FamilyPhotoForm loading={loading} modelPreloadState={modelPreloadState} onAnalyze={handleFamilyAnalyze} onPhotosAdded={startModelPreload} />
         )}
 
         <p className="mt-8 text-center text-xs text-neutral-400">v{__APP_VERSION__}</p>
