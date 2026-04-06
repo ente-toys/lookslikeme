@@ -327,7 +327,7 @@ function App() {
         {/* Ente referral bar */}
         <div className="mb-4 text-center">
           <a
-            href="https://ente.com/?utm_source=lookslikeme"
+            href="https://ente.com"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-full bg-[rgba(92,61,46,0.06)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--brown-light)] transition-colors hover:bg-[rgba(92,61,46,0.1)] hover:text-[var(--terracotta)]"
@@ -389,7 +389,7 @@ function App() {
 
           <div>
             <a
-              href="https://ente.io/?utm_source=lookslikeme"
+              href="https://ente.io"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 rounded-full bg-[rgba(92,61,46,0.05)] px-4 py-2 text-xs font-medium text-[var(--brown-light)] transition-colors hover:bg-[rgba(92,61,46,0.1)] hover:text-[var(--terracotta)]"
