@@ -251,6 +251,7 @@ export function FamilyPhotoForm({ loading, modelPreloadState, onAnalyze, onPhoto
     maxFiles: MAX_UPLOAD_IMAGES,
     noClick: isMobilePicker,
     noKeyboard: isMobilePicker,
+    useFsAccessApi: false,
   });
 
   const removeFile = (index: number) => {
