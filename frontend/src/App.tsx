@@ -6,6 +6,7 @@ import {
   type ProcessingOverlayVariant,
   type ProcessingPerson,
 } from "./components/ProcessingOverlay";
+import { Privacy } from "./components/Privacy";
 import {
   analyzeFamilyUpload,
   compareFamilySelection,
@@ -329,7 +330,7 @@ function App() {
           <a
             href="https://ente.com"
             target="_blank"
-            rel="noopener noreferrer"
+            rel="noopener"
             className="inline-flex items-center gap-1.5 rounded-full bg-[rgba(92,61,46,0.06)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--brown-light)] transition-colors hover:bg-[rgba(92,61,46,0.1)] hover:text-[var(--terracotta)]"
           >
             Made with
@@ -378,7 +379,7 @@ function App() {
           <a
             href="https://github.com/ente-toys/lookslikeme"
             target="_blank"
-            rel="noopener noreferrer"
+            rel="noopener"
             className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--terracotta)]"
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
@@ -391,13 +392,15 @@ function App() {
             <a
               href="https://ente.io"
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener"
               className="inline-flex items-center gap-1.5 rounded-full bg-[rgba(92,61,46,0.05)] px-4 py-2 text-xs font-medium text-[var(--brown-light)] transition-colors hover:bg-[rgba(92,61,46,0.1)] hover:text-[var(--terracotta)]"
             >
               Your family photos, safe forever &mdash;
               <strong className="font-semibold">Ente Photos</strong>
             </a>
           </div>
+
+          <Privacy />
 
           <p className="text-[10px] text-neutral-400">v{__APP_VERSION__}</p>
         </footer>
