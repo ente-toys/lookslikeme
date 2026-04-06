@@ -275,70 +275,28 @@ export function FamilyPhotoForm({ loading, modelPreloadState, onAnalyze, onPhoto
     <div className="space-y-5">
       <input {...getInputProps()} />
 
+      {/* Sample result preview (only when empty) */}
+      {files.length === 0 && <SampleResultPreview onTryIt={open} />}
+
       {/* Upload card */}
       <div
-        className="theme-card rounded-[var(--radius)] p-6"
+        className="theme-card rounded-[var(--radius)] p-5"
         style={{ animation: "cardIn 0.5s ease 0.3s backwards" }}
       >
-        <span className="text-[10px] font-semibold uppercase tracking-[1.8px] text-[var(--text-muted)]">
-          Family Photos
-        </span>
-
         {files.length === 0 ? (
           <>
-            <h2 className="theme-editorial mt-2 text-[22px] font-medium leading-snug text-[var(--text)]">
-              Add your family photos
-            </h2>
-            <p className="mt-1.5 text-[14px] leading-relaxed text-[var(--text-muted)]">
-              We'll find the faces and show you who looks like who.
-            </p>
-
             {/* Drop zone / picker */}
             {isMobilePicker ? (
-              <div className="mt-5">
-                <button
-                  type="button"
-                  onClick={open}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--border)] px-5 py-9 text-center transition-all hover:border-[var(--peach)] hover:bg-[rgba(244,162,97,0.04)]"
-                >
-                  <div>
-                    <div className="mx-auto mb-3.5 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--peach-light)]">
-                      <svg
-                        className="text-[var(--terracotta)]"
-                        width="22"
-                        height="22"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="17 8 12 3 7 8" />
-                        <line x1="12" y1="3" x2="12" y2="15" />
-                      </svg>
-                    </div>
-                    <p className="text-[15px] font-medium text-[var(--text)]">
-                      Tap to add photos
-                    </p>
-                  </div>
-                </button>
-              </div>
-            ) : (
-              <div
-                {...getRootProps()}
-                className={`mt-5 cursor-pointer rounded-2xl border-2 border-dashed px-5 py-9 text-center transition-all ${
-                  isDragActive
-                    ? "scale-[1.01] border-[var(--peach)] bg-[rgba(244,162,97,0.04)] shadow-[0_0_0_4px_rgba(244,162,97,0.1)]"
-                    : "border-[var(--border)] hover:border-[var(--peach)] hover:bg-[rgba(244,162,97,0.04)]"
-                }`}
+              <button
+                type="button"
+                onClick={open}
+                className="flex w-full items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-[var(--border)] px-5 py-7 text-center transition-all hover:border-[var(--peach)] hover:bg-[rgba(244,162,97,0.04)]"
               >
-                <div className="mx-auto mb-3.5 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--peach-light)] transition-transform hover:scale-[1.08]">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--peach-light)]">
                   <svg
                     className="text-[var(--terracotta)]"
-                    width="22"
-                    height="22"
+                    width="20"
+                    height="20"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -352,7 +310,37 @@ export function FamilyPhotoForm({ loading, modelPreloadState, onAnalyze, onPhoto
                   </svg>
                 </div>
                 <p className="text-[15px] font-medium text-[var(--text)]">
-                  Drop photos here or{" "}
+                  Tap to add family photos
+                </p>
+              </button>
+            ) : (
+              <div
+                {...getRootProps()}
+                className={`cursor-pointer rounded-2xl border-2 border-dashed px-5 py-7 text-center transition-all ${
+                  isDragActive
+                    ? "scale-[1.01] border-[var(--peach)] bg-[rgba(244,162,97,0.04)] shadow-[0_0_0_4px_rgba(244,162,97,0.1)]"
+                    : "border-[var(--border)] hover:border-[var(--peach)] hover:bg-[rgba(244,162,97,0.04)]"
+                }`}
+              >
+                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--peach-light)] transition-transform hover:scale-[1.08]">
+                  <svg
+                    className="text-[var(--terracotta)]"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                </div>
+                <p className="text-[15px] font-medium text-[var(--text)]">
+                  Drop family photos here or{" "}
                   <span className="text-[var(--terracotta)] underline underline-offset-2">
                     browse
                   </span>
@@ -425,8 +413,8 @@ export function FamilyPhotoForm({ loading, modelPreloadState, onAnalyze, onPhoto
         )}
       </div>
 
-      {/* Status + CTA Button */}
-      <div style={{ animation: "cardIn 0.5s ease 0.5s backwards" }}>
+      {/* Status + CTA Button (only after photos added) */}
+      {files.length > 0 && <div style={{ animation: "cardIn 0.5s ease 0.5s backwards" }}>
         {converting && (
           <div className="mb-3 rounded-xl bg-[rgba(92,61,46,0.05)] px-4 py-3">
             <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
@@ -496,7 +484,7 @@ export function FamilyPhotoForm({ loading, modelPreloadState, onAnalyze, onPhoto
             </svg>
           )}
         </button>
-      </div>
+      </div>}
 
       {/* Trust footer */}
       <div
@@ -527,55 +515,6 @@ export function FamilyPhotoForm({ loading, modelPreloadState, onAnalyze, onPhoto
         </div>
       </div>
 
-      {/* Sample result preview (only when empty) */}
-      {files.length === 0 && <SampleResultPreview onTryIt={open} />}
-
-      {/* How it works (only when empty) */}
-      {files.length === 0 && (
-        <div className="mt-4 pt-2" style={{ animation: "cardIn 0.5s ease 0.8s backwards" }}>
-          <p className="mb-4.5 text-center text-[10px] font-semibold uppercase tracking-[1.8px] text-[var(--text-muted)]">
-            How it works
-          </p>
-          <div className="flex flex-col">
-            {[
-              {
-                step: "1",
-                title: "Add a few family photos",
-                desc: "Group shots, selfies, old scanned prints \u2014 anything works.",
-              },
-              {
-                step: "2",
-                title: "We detect every face",
-                desc: "Faces are found and grouped automatically, right on your device.",
-              },
-              {
-                step: "3",
-                title: "See who looks like who",
-                desc: "We compare every pair and show you the strongest resemblances.",
-              },
-            ].map((item, i, arr) => (
-              <div key={item.step} className="flex gap-3.5">
-                <div className="flex shrink-0 flex-col items-center">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--terracotta)] font-['Fraunces',serif] text-sm font-bold text-[var(--warm-white)]">
-                    {item.step}
-                  </div>
-                  {i < arr.length - 1 && (
-                    <div className="min-h-5 w-0.5 flex-1 bg-[var(--border)]" />
-                  )}
-                </div>
-                <div className={i < arr.length - 1 ? "pb-6" : ""}>
-                  <p className="text-[14.5px] font-semibold leading-8 text-[var(--text)]">
-                    {item.title}
-                  </p>
-                  <p className="text-[13.5px] leading-relaxed text-[var(--text-muted)]">
-                    {item.desc}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
