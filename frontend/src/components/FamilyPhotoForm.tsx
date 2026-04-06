@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { areAllFilesCached } from "../utils/faceCache";
 import { isHeicFile, convertHeicToJpeg } from "../utils/heicConvert";
+import { SampleResultPreview } from "./SampleResultPreview";
 import type { ModelPreloadProgress } from "../types";
 
 type ModelPreloadState =
@@ -272,7 +273,7 @@ export function FamilyPhotoForm({ loading, modelPreloadState, onAnalyze, onPhoto
 
   return (
     <div className="space-y-5">
-      <input {...getInputProps({ className: "hidden" })} />
+      <input {...getInputProps()} />
 
       {/* Upload card */}
       <div
@@ -519,12 +520,15 @@ export function FamilyPhotoForm({ loading, modelPreloadState, onAnalyze, onPhoto
             On-device
           </span>
           <span>Nothing leaves your device.{" "}
-            <a href="#" className="theme-link">
+            <a href="#privacy" className="theme-link">
               Learn more
             </a>
           </span>
         </div>
       </div>
+
+      {/* Sample result preview (only when empty) */}
+      {files.length === 0 && <SampleResultPreview onTryIt={open} />}
 
       {/* How it works (only when empty) */}
       {files.length === 0 && (

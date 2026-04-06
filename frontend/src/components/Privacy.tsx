@@ -1,11 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function Privacy() {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(() => window.location.hash === "#privacy");
+
+  useEffect(() => {
+    function onHash() {
+      if (window.location.hash === "#privacy") setOpen(true);
+    }
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   if (!open) {
     return (
       <button
+        id="privacy"
         onClick={() => setOpen(true)}
         className="text-[11px] font-medium text-[var(--text-muted)] underline decoration-dotted underline-offset-2 transition-colors hover:text-[var(--terracotta)]"
       >
@@ -15,7 +24,10 @@ export function Privacy() {
   }
 
   return (
-    <div className="mx-auto mt-2 max-w-md rounded-[var(--radius)] border border-[var(--border)] bg-[var(--warm-white)] px-5 py-5 text-left text-sm leading-relaxed text-[var(--text)]">
+    <div
+      id="privacy"
+      className="mx-auto mt-2 max-w-md rounded-[var(--radius)] border border-[var(--border)] bg-[var(--warm-white)] px-5 py-5 text-left text-sm leading-relaxed text-[var(--text)]"
+    >
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-base font-semibold">Privacy &amp; Terms</h2>
         <button
@@ -91,6 +103,24 @@ export function Privacy() {
         from <code className="rounded bg-[rgba(92,61,46,0.06)] px-1 py-0.5 text-xs">models.ente.io</code>.
         No other third-party services are contacted.
       </p>
+
+      <h3 className="mb-1.5 mt-4 text-xs font-semibold uppercase tracking-wider text-[var(--brown-light)]">
+        Credits
+      </h3>
+      <ul className="mb-3 list-inside list-disc space-y-1 text-[var(--text-muted)]">
+        <li>
+          Face detection and recognition models by{" "}
+          <a href="https://github.com/deepinsight/insightface" target="_blank" rel="noopener" className="font-medium text-[var(--terracotta)] underline decoration-dotted underline-offset-2">InsightFace</a>.
+        </li>
+        <li>
+          Sample avatars:{" "}
+          <a href="https://www.figma.com/community/file/1184595184137881796" target="_blank" rel="noopener" className="font-medium text-[var(--terracotta)] underline decoration-dotted underline-offset-2">Adventurer</a>
+          {" "}by Lisa Wischofsky, licensed under{" "}
+          <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener" className="font-medium text-[var(--terracotta)] underline decoration-dotted underline-offset-2">CC BY 4.0</a>,
+          via{" "}
+          <a href="https://www.dicebear.com" target="_blank" rel="noopener" className="font-medium text-[var(--terracotta)] underline decoration-dotted underline-offset-2">DiceBear</a>.
+        </li>
+      </ul>
 
       <h3 className="mb-1.5 mt-4 text-xs font-semibold uppercase tracking-wider text-[var(--brown-light)]">
         Open source
